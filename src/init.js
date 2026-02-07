@@ -18,7 +18,7 @@ const PRODUCTOS = [
   // ACOMPAÑAMIENTOS
   { id: 's2', nombre: 'Papas con Cheddar', categoria: 'acompañamiento', precio: 6000, imagen: '🧀', descripcion: 'Porción extra bañada en salsa cheddar.' },
   { id: 's4', nombre: 'Papas CoCo\'s', categoria: 'acompañamiento', precio: 7500, imagen: '🥓', descripcion: 'Porción extra con cheddar, panceta y verdeo.' },
-  { id: 's3', nombre: 'Aros de Cebolla', categoria: 'acompañamiento', precio: 5000, imagen: ' onion ' },
+  { id: 's3', nombre: 'Aros de Cebolla', categoria: 'acompañamiento', precio: 5000, imagen: '🧅' },
   // NUGGETS
   { id: 'n1', nombre: 'Nuggets (6 pzs)', categoria: 'nuggets', precio: 4800, imagen: '🍗' },
   { id: 'n2', nombre: 'Nuggets (12 pzs)', categoria: 'nuggets', precio: 8500, imagen: '🍗' },
@@ -29,9 +29,12 @@ async function initDB() {
   try {
     console.log("🛠️ Limpiando y creando tablas en Turso...");
 
-    // Eliminamos para resetear (Cuidado: esto borra datos existentes)
+    // Tablas base
     await client.execute(`DROP TABLE IF EXISTS productos`);
     await client.execute(`DROP TABLE IF EXISTS pedidos`);
+    // Tablas de finanzas (las reseteamos también para asegurar estructura)
+    await client.execute(`DROP TABLE IF EXISTS cierres`);
+    await client.execute(`DROP TABLE IF EXISTS finanzas`);
 
     // 1. Tabla de Productos
     await client.execute(`
@@ -46,7 +49,7 @@ async function initDB() {
       )
     `);
 
-    // 2. Tabla de Pedidos (Con columna FECHA explícita)
+    // 2. Tabla de Pedidos
     await client.execute(`
       CREATE TABLE pedidos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,6 +60,27 @@ async function initDB() {
         estado TEXT DEFAULT 'pendiente',
         metodoPago TEXT,
         fecha TEXT NOT NULL
+      )
+    `);
+
+    // 3. Tabla de Cierres (LO NUEVO)
+    await client.execute(`
+      CREATE TABLE cierres (
+        id TEXT PRIMARY KEY,
+        fecha TEXT NOT NULL,
+        totalVentas REAL NOT NULL,
+        cantidadPedidos INTEGER NOT NULL
+      )
+    `);
+
+    // 4. Tabla de Finanzas (LO NUEVO)
+    await client.execute(`
+      CREATE TABLE finanzas (
+        id TEXT PRIMARY KEY,
+        fecha TEXT NOT NULL,
+        descripcion TEXT,
+        monto REAL NOT NULL,
+        tipo TEXT NOT NULL
       )
     `);
 
@@ -78,7 +102,7 @@ async function initDB() {
       });
     }
 
-    console.log("✅ Base de datos lista para trabajar.");
+    console.log("✅ Base de datos reseteada y lista.");
     process.exit(0);
   } catch (error) {
     console.error("❌ Error inicializando:", error);
