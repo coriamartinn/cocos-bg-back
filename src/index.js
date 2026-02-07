@@ -42,7 +42,7 @@ app.get('/api/finanzas', async (req, res) => {
     }
 });
 
-// Cierre de Caja - CORREGIDO
+// --- CIERRE DE CAJA ---
 app.post('/api/cierre-caja', async (req, res) => {
     const { totalVentas, cantidadPedidos } = req.body;
     const fecha = new Date().toISOString();
@@ -51,25 +51,29 @@ app.post('/api/cierre-caja', async (req, res) => {
         const total = Number(totalVentas) || 0;
         const cantidad = Number(cantidadPedidos) || 0;
 
-        // 1. Registrar el cierre
+        // 1. Guardamos el resumen en la tabla 'cierres'
         await client.execute({
             sql: "INSERT INTO cierres (id, fecha, totalVentas, cantidadPedidos) VALUES (?, ?, ?, ?)",
             args: [crypto.randomUUID(), fecha, total, cantidad]
         });
 
-        // 2. Insertar en finanzas como ingreso
+        // 2. Registramos el movimiento en 'finanzas'
         await client.execute({
             sql: "INSERT INTO finanzas (id, fecha, descripcion, monto, tipo) VALUES (?, ?, ?, ?, ?)",
             args: [crypto.randomUUID(), fecha, `CIERRE: ${cantidad} pedidos`, total, 'ingreso']
         });
 
-        // 3. Limpiar pedidos actuales
+        // 3. Vaciamos la tabla de pedidos del día
         await client.execute("DELETE FROM pedidos");
 
-        res.json({ success: true, message: "Cierre completado" });
+        // 4. RESETEAMOS EL CONTADOR (Para que mañana el primer pedido sea el #1)
+        // Esta tabla 'sqlite_sequence' es interna de la DB y maneja los AUTOINCREMENT
+        await client.execute("DELETE FROM sqlite_sequence WHERE name='pedidos'");
+
+        res.json({ success: true, message: "Cierre completado y contador reseteado" });
     } catch (error) {
         console.error("Error en cierre:", error);
-        res.status(500).json({ error: "Fallo en el proceso de cierre", detalle: error.message });
+        res.status(500).json({ error: "Fallo en el proceso de cierre" });
     }
 });
 

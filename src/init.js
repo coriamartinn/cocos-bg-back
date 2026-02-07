@@ -35,6 +35,9 @@ async function initDB() {
     // Tablas de finanzas (las reseteamos también para asegurar estructura)
     await client.execute(`DROP TABLE IF EXISTS cierres`);
     await client.execute(`DROP TABLE IF EXISTS finanzas`);
+    // En el DELETE del cierre de caja
+    await client.execute("DELETE FROM pedidos");
+    await client.execute("DELETE FROM sqlite_sequence WHERE name='pedidos'"); // Esto resetea el contador a 0
 
     // 1. Tabla de Productos
     await client.execute(`
@@ -51,17 +54,16 @@ async function initDB() {
 
     // 2. Tabla de Pedidos
     await client.execute(`
-      CREATE TABLE pedidos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        numeroPedido TEXT NOT NULL,
-        cliente TEXT,
-        items TEXT NOT NULL,
-        total REAL NOT NULL,
-        estado TEXT DEFAULT 'pendiente',
-        metodoPago TEXT,
-        fecha TEXT NOT NULL
-      )
-    `);
+  CREATE TABLE pedidos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, -- Este será tu 1, 2, 3...
+    cliente TEXT,
+    items TEXT NOT NULL,
+    total REAL NOT NULL,
+    estado TEXT DEFAULT 'pendiente',
+    metodoPago TEXT,
+    fecha TEXT NOT NULL
+  )
+`);
 
     // 3. Tabla de Cierres (LO NUEVO)
     await client.execute(`

@@ -1,39 +1,39 @@
-import { Router } from 'express'; // 1. IMPORTANTE: Importar Router
-import { client } from '../db.js'; // Asegurate que la ruta a db.js sea correcta
+import { Router } from 'express';
+import { client } from '../db.js';
 
-const router = Router(); // 2. IMPORTANTE: Definir la variable router
+const router = Router();
 
-// --- POST: Guardar un nuevo pedido ---
+// --- POST: Crear pedido (La DB asigna el ID automáticamente) ---
 router.post('/', async (req, res) => {
-    const { cliente, items, total, metodoPago, numeroPedido, fecha } = req.body;
+    const { cliente, items, total, metodoPago, fecha } = req.body;
 
     try {
         const fechaFinal = fecha || new Date().toISOString();
-        const numeroFinal = numeroPedido || `CC-${Math.floor(Math.random() * 9000) + 1000}`;
 
+        // No enviamos 'id' ni 'numeroPedido', la DB usa el AUTOINCREMENT del id
         const result = await client.execute({
-            sql: `INSERT INTO pedidos (numeroPedido, cliente, items, total, estado, metodoPago, fecha) 
-                  VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            sql: `INSERT INTO pedidos (cliente, items, total, estado, metodoPago, fecha, numeroPedido) 
+                  VALUES (?, ?, ?, ?, ?, ?, ?) 
+                  RETURNING *`, // <--- Esto nos devuelve el pedido completo con el ID real
             args: [
-                numeroFinal,
                 cliente || 'Consumidor Final',
                 typeof items === 'string' ? items : JSON.stringify(items),
                 total || 0,
                 'pendiente',
                 metodoPago || 'Efectivo',
-                fechaFinal
+                fechaFinal,
+                'TEMP' // Podemos usar una columna temporal o simplemente usar el ID como número
             ]
         });
 
+        const nuevoPedido = result.rows[0];
+
+        // Opcional: Si querés que el número de pedido visual sea igual al ID
+        // Podemos hacer un pequeño update o simplemente manejarlo en el front
+
         res.status(201).json({
-            id: result.lastInsertRowid?.toString(),
-            numeroPedido: numeroFinal,
-            cliente: cliente || 'Consumidor Final',
-            items: typeof items === 'string' ? JSON.parse(items) : items,
-            total,
-            estado: 'pendiente',
-            metodoPago,
-            fecha: fechaFinal
+            ...nuevoPedido,
+            items: typeof nuevoPedido.items === 'string' ? JSON.parse(nuevoPedido.items) : nuevoPedido.items
         });
     } catch (error) {
         console.error("Error al guardar pedido:", error.message);
@@ -44,7 +44,7 @@ router.post('/', async (req, res) => {
 // --- GET: Obtener todos los pedidos ---
 router.get('/', async (req, res) => {
     try {
-        const result = await client.execute("SELECT * FROM pedidos ORDER BY fecha DESC");
+        const result = await client.execute("SELECT * FROM pedidos ORDER BY id ASC");
         const pedidos = result.rows.map(row => ({
             ...row,
             items: typeof row.items === 'string' ? JSON.parse(row.items) : row.items
@@ -55,7 +55,7 @@ router.get('/', async (req, res) => {
     }
 });
 
-// --- PATCH: Actualizar estado ---
+// --- PATCH: Actualizar estado (Usando el ID numérico de la DB) ---
 router.patch('/:id', async (req, res) => {
     const { id } = req.params;
     const { estado } = req.body;
@@ -70,18 +70,23 @@ router.patch('/:id', async (req, res) => {
     }
 });
 
-// --- DELETE: Eliminar pedido ---
+// --- DELETE: Eliminar pedido (Usando el ID numérico de la DB) ---
 router.delete('/:id', async (req, res) => {
     const { id } = req.params;
     try {
-        await client.execute({
+        const result = await client.execute({
             sql: "DELETE FROM pedidos WHERE id = ?",
             args: [id]
         });
+
+        if (result.rowsAffected === 0) {
+            return res.status(404).json({ error: "Pedido no encontrado" });
+        }
+
         res.json({ success: true, message: "Pedido eliminado" });
     } catch (error) {
         res.status(500).json({ error: "No se pudo eliminar el pedido" });
     }
 });
 
-export default router; // 3. IMPORTANTE: Exportar el router
+export default router;
