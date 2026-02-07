@@ -1,83 +1,41 @@
-import { Router } from 'express';
-import client from '../db.js';
-
-const router = Router();
-
 // --- POST: Guardar un nuevo pedido ---
 router.post('/', async (req, res) => {
-    const { cliente, items, total, metodoPago } = req.body;
+    // Recibimos los datos del frontend
+    const { cliente, items, total, metodoPago, numeroPedido } = req.body;
+
     try {
-        const numeroPedido = `CC-${Math.floor(Math.random() * 9000) + 1000}`;
+        // Si el frontend no manda número, generamos uno (pero el de App.tsx ya debería llegar)
+        const numeroFinal = numeroPedido || `CC-${Math.floor(Math.random() * 9000) + 1000}`;
+        const fechaActual = new Date().toISOString();
+
         const result = await client.execute({
-            sql: `INSERT INTO pedidos (numeroPedido, cliente, items, total, estado, metodoPago) 
-            VALUES (?, ?, ?, ?, ?, ?)`,
+            sql: `INSERT INTO pedidos (numeroPedido, cliente, items, total, estado, metodoPago, fecha) 
+                  VALUES (?, ?, ?, ?, ?, ?, ?)`,
             args: [
-                numeroPedido,
+                numeroFinal,
                 cliente || 'Consumidor Final',
-                JSON.stringify(items),
-                total,
+                JSON.stringify(items), // Convertimos el array a string para SQLite/Turso
+                total || 0,
                 'pendiente',
-                metodoPago
+                metodoPago || 'Efectivo',
+                fechaActual // <--- IMPORTANTE: Guardar la fecha
             ]
         });
 
+        // Respondemos al frontend con el ID que generó la base de datos
         res.status(201).json({
             id: result.lastInsertRowid?.toString(),
-            numeroPedido,
-            cliente,
+            numeroPedido: numeroFinal,
+            cliente: cliente || 'Consumidor Final',
             items,
             total,
             estado: 'pendiente',
             metodoPago,
-            fecha: new Date().toISOString()
+            fecha: fechaActual
         });
     } catch (error) {
-        console.error("Error al guardar pedido:", error);
-        res.status(500).json({ error: "Error de base de datos" });
+        // Esto te va a decir en los logs de Koyeb exactamente qué columna falta
+        console.error("Error detallado en DB:", error.message);
+        res.status(500).json({ error: "Error de base de datos", detalle: error.message });
     }
 });
-
-// --- GET: Obtener todos los pedidos ---
-router.get('/', async (req, res) => {
-    try {
-        const result = await client.execute("SELECT * FROM pedidos ORDER BY fecha DESC");
-        const pedidos = result.rows.map(row => ({
-            ...row,
-            items: typeof row.items === 'string' ? JSON.parse(row.items) : row.items
-        }));
-        res.json(pedidos);
-    } catch (error) {
-        res.status(500).json({ error: "Error al obtener pedidos" });
-    }
-});
-
-// --- PATCH: Actualizar estado del pedido (Cocina) ---
-router.patch('/:id', async (req, res) => {
-    const { id } = req.params;
-    const { estado } = req.body;
-    try {
-        await client.execute({
-            sql: "UPDATE pedidos SET estado = ? WHERE id = ?",
-            args: [estado, id]
-        });
-        res.json({ success: true, id, nuevoEstado: estado });
-    } catch (error) {
-        res.status(500).json({ error: "No se pudo actualizar el estado" });
-    }
-});
-
-// --- DELETE: Eliminar pedido (Cancelar o Limpiar) ---
-router.delete('/:id', async (req, res) => {
-    const { id } = req.params;
-    try {
-        await client.execute({
-            sql: "DELETE FROM pedidos WHERE id = ?",
-            args: [id]
-        });
-        res.json({ success: true, message: "Pedido eliminado" });
-    } catch (error) {
-        res.status(500).json({ error: "No se pudo eliminar el pedido" });
-    }
-});
-
-export default router;
