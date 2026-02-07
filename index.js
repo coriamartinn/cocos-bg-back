@@ -33,7 +33,7 @@ app.use(cors({
 app.use(express.json());
 
 // Puerto dinámico para Koyeb
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 8000;
 
 // Middleware simple para loguear peticiones (útil para debug en Koyeb)
 app.use((req, res, next) => {
