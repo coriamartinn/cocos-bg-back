@@ -4,7 +4,27 @@ import { client } from './db.js';
 import crypto from 'crypto';
 
 const app = express();
-app.use(cors());
+
+const allowedOrigins = [
+    'http://localhost:5173', // Para cuando desarrollás en tu PC
+    process.env.FRONTEND_URL  // La URL de Vercel que pondrás en Koyeb
+];
+
+app.use(cors({
+    origin: function (origin, callback) {
+        // Permitir peticiones sin origen (como Postman o apps móviles)
+        if (!origin) return callback(null, true);
+
+        if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+            callback(null, true);
+        } else {
+            callback(new Error('No permitido por CORS'));
+        }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 
 const PORT = process.env.PORT || 8080;
