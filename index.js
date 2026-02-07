@@ -12,7 +12,7 @@ const app = express();
 // --- CONFIGURACIÓN DE SEGURIDAD (CORS) ---
 const allowedOrigins = [
     'http://localhost:5173',
-    'https://tu-app-en-vercel.vercel.app' // 👈 REEMPLAZÁ CON TU URL REAL DE VERCEL
+    'https://cocos.coriadev.com' // 👈 REEMPLAZÁ CON TU URL REAL DE VERCEL
 ];
 
 app.use(cors({
