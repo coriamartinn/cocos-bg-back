@@ -1,20 +1,16 @@
 import { createClient } from '@libsql/client';
 import dotenv from 'dotenv';
 
-// Forzamos la carga de variables
 dotenv.config();
 
-// Creamos constantes locales para debuguear
-const url = process.env.TURSO_URL;
-const authToken = process.env.TURSO_TOKEN;
+// Usamos los nombres EXACTOS de tu archivo .env
+const url = process.env.TURSO_DATABASE_URL; // Antes decía TURSO_URL
+const authToken = process.env.TURSO_AUTH_TOKEN; // Antes decía TURSO_TOKEN
 
-// LOGS DE EMERGENCIA: Esto aparecerá en la consola de Koyeb
 console.log("--- CHEQUEO DE VARIABLES ---");
-console.log("URL de Turso:", url ? "RECIBIDA ✅" : "VIENE VACÍA (undefined) ❌");
+console.log("URL de Turso:", url ? "RECIBIDA ✅" : "VIENE VACÍA ❌");
 
-// Si la URL falla, le damos un string vacío para que no explote el proceso entero 
-// y nos deje ver los logs con calma
 export const client = createClient({
-    url: url || "libsql://cocos-burger-coriamartinn.aws-us-east-1.turso.io",
-    authToken: authToken || "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NzA0ODM5MzUsImlkIjoiYjFiM2JlYWItZTJhOC00YTQyLWI1YTgtMWMwMTYxMTNiNDIzIiwicmlkIjoiYjAzZTc3NjYtOGI4MC00OTM4LWE4ZGEtMDc5MjNhODY3NTAwIn0.5_1EJ8uiKgnQwq5FM0cj7fdVhmOHfsVbAnYHfkiWZTm2Bp_NmDiGqZsz7WmGUCBYX-WHfaLwCMHsAVYgfNAUCA",
+    url: url || "",
+    authToken: authToken || "",
 });
