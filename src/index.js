@@ -17,9 +17,17 @@ const app = express();
 // --- CONFIGURACIÓN DE CORS ---
 const allowedOrigins = [
     'http://localhost:5173',
-    'https://cocos.coriadev.com',
-    'https://cocos-burger.vercel.app' // Añadí esta por las dudas si usas la default de Vercel
+    'https://cocos.coriadev.com'
 ];
+
+app.get('/test-db', async (req, res) => {
+    try {
+        const rs = await client.execute("SELECT 1");
+        res.json({ status: "Conectado a Turso", data: rs });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 app.use(cors({
     origin: function (origin, callback) {
