@@ -1,14 +1,14 @@
 import express from 'express';
 import cors from 'cors';
-import { client } from './src/db.js'; // Ajustado a tu estructura de carpetas
+import { client } from './db.js'; // Ajustado a tu estructura de carpetas
 import crypto from 'crypto';
 import dotenv from 'dotenv';
 
 // Importamos las nuevas rutas (aseguráte de que los archivos existan)
-import productosRoutes from './src/routes/productos.routes.js';
+import productosRoutes from './routes/productos.routes.js';
 // Importaremos pedidos desde el archivo de rutas para limpiar el index
 // Pero por ahora, mantengo tu lógica de pedidos aquí y la mejoro
-import pedidosRoutes from './src/routes/pedidos.routes.js';
+import pedidosRoutes from './routes/pedidos.routes.js';
 
 dotenv.config();
 
