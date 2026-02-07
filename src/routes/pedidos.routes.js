@@ -1,10 +1,12 @@
-// --- POST: Guardar un nuevo pedido ---
 router.post('/', async (req, res) => {
-    // Recibimos los datos del frontend
-    const { cliente, items, total, metodoPago, numeroPedido } = req.body;
-
     try {
-        // Si el frontend no manda número, generamos uno (pero el de App.tsx ya debería llegar)
+        const { cliente, items, total, metodoPago, numeroPedido } = req.body;
+
+        // Validación manual: Si esto falla, el 500 es por datos incompletos
+        if (!items || !total) {
+            return res.status(400).json({ error: "Faltan items o total" });
+        }
+
         const numeroFinal = numeroPedido || `CC-${Math.floor(Math.random() * 9000) + 1000}`;
         const fechaActual = new Date().toISOString();
 
@@ -14,28 +16,31 @@ router.post('/', async (req, res) => {
             args: [
                 numeroFinal,
                 cliente || 'Consumidor Final',
-                JSON.stringify(items), // Convertimos el array a string para SQLite/Turso
-                total || 0,
+                typeof items === 'string' ? items : JSON.stringify(items),
+                total,
                 'pendiente',
                 metodoPago || 'Efectivo',
-                fechaActual // <--- IMPORTANTE: Guardar la fecha
+                fechaActual
             ]
         });
 
-        // Respondemos al frontend con el ID que generó la base de datos
         res.status(201).json({
             id: result.lastInsertRowid?.toString(),
             numeroPedido: numeroFinal,
-            cliente: cliente || 'Consumidor Final',
-            items,
+            cliente,
+            items: typeof items === 'string' ? JSON.parse(items) : items,
             total,
             estado: 'pendiente',
             metodoPago,
             fecha: fechaActual
         });
     } catch (error) {
-        // Esto te va a decir en los logs de Koyeb exactamente qué columna falta
-        console.error("Error detallado en DB:", error.message);
-        res.status(500).json({ error: "Error de base de datos", detalle: error.message });
+        // ESTE LOG ES EL QUE TENÉS QUE BUSCAR EN KOYEB
+        console.error("LOG CRÍTICO DB:", error.message);
+        res.status(500).json({
+            error: "Error interno del servidor",
+            message: error.message, // Mandamos el mensaje al front para verlo en la consola
+            stack: error.stack
+        });
     }
 });
