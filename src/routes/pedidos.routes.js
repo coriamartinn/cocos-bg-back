@@ -1,14 +1,14 @@
+// --- POST: Guardar un nuevo pedido ---
 router.post('/', async (req, res) => {
+    // 1. Extraemos los datos del body
+    const { cliente, items, total, metodoPago, numeroPedido, fecha } = req.body;
+
     try {
-        const { cliente, items, total, metodoPago, numeroPedido } = req.body;
-
-        // Validación manual: Si esto falla, el 500 es por datos incompletos
-        if (!items || !total) {
-            return res.status(400).json({ error: "Faltan items o total" });
-        }
-
+        // 2. Si el front no manda fecha, la generamos nosotros (Garantiza que no sea NULL)
+        const fechaFinal = fecha || new Date().toISOString();
         const numeroFinal = numeroPedido || `CC-${Math.floor(Math.random() * 9000) + 1000}`;
-        const fechaActual = new Date().toISOString();
+
+        console.log("Intentando guardar pedido con fecha:", fechaFinal);
 
         const result = await client.execute({
             sql: `INSERT INTO pedidos (numeroPedido, cliente, items, total, estado, metodoPago, fecha) 
@@ -17,32 +17,27 @@ router.post('/', async (req, res) => {
                 numeroFinal,
                 cliente || 'Consumidor Final',
                 typeof items === 'string' ? items : JSON.stringify(items),
-                total,
+                total || 0,
                 'pendiente',
                 metodoPago || 'Efectivo',
-                fechaActual
+                fechaFinal // <--- AQUÍ SE SOLUCIONA EL ERROR
             ]
         });
 
+        // 3. Respondemos al frontend
         res.status(201).json({
             id: result.lastInsertRowid?.toString(),
             numeroPedido: numeroFinal,
-            cliente,
+            cliente: cliente || 'Consumidor Final',
             items: typeof items === 'string' ? JSON.parse(items) : items,
             total,
             estado: 'pendiente',
             metodoPago,
-            fecha: fechaActual
+            fecha: fechaFinal
         });
     } catch (error) {
-        // ESTE LOG ES EL QUE TENÉS QUE BUSCAR EN KOYEB
-        console.error("LOG CRÍTICO DB:", error.message);
-        res.status(500).json({
-            error: "Error interno del servidor",
-            message: error.message, // Mandamos el mensaje al front para verlo en la consola
-            stack: error.stack
-        });
+        console.error("Error detallado en la inserción:", error.message);
+        res.status(500).json({ error: "Error de base de datos", detalle: error.message });
     }
 });
-
 export default router;
