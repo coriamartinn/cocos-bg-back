@@ -29,69 +29,66 @@ async function initDB() {
   try {
     console.log("🛠️ Limpiando y creando tablas en Turso...");
 
-    // Tablas base
+    // 1. Borrado controlado (Solo si querés resetear todo de cero)
     await client.execute(`DROP TABLE IF EXISTS productos`);
     await client.execute(`DROP TABLE IF EXISTS pedidos`);
-    // Tablas de finanzas (las reseteamos también para asegurar estructura)
     await client.execute(`DROP TABLE IF EXISTS cierres`);
     await client.execute(`DROP TABLE IF EXISTS finanzas`);
-    // En el DELETE del cierre de caja
-    await client.execute("DELETE FROM pedidos");
-    await client.execute("DELETE FROM sqlite_sequence WHERE name='pedidos'"); // Esto resetea el contador a 0
 
-    // 1. Tabla de Productos
+    // 2. Creación de Tabla de Productos
     await client.execute(`
-      CREATE TABLE productos (
-        id TEXT PRIMARY KEY,
-        nombre TEXT NOT NULL,
-        categoria TEXT NOT NULL,
-        precio REAL DEFAULT 0,
-        imagen TEXT,
-        descripcion TEXT,
-        tamanos TEXT
-      )
-    `);
+            CREATE TABLE productos (
+                id TEXT PRIMARY KEY,
+                nombre TEXT NOT NULL,
+                categoria TEXT NOT NULL,
+                precio REAL DEFAULT 0,
+                imagen TEXT,
+                descripcion TEXT,
+                tamanos TEXT
+            )
+        `);
 
-    // 2. Tabla de Pedidos
+    // 3. Creación de Tabla de Pedidos (IMPORTANTE: id autoincremental)
     await client.execute(`
-  CREATE TABLE pedidos (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, -- Este será tu 1, 2, 3...
-    cliente TEXT,
-    items TEXT NOT NULL,
-    total REAL NOT NULL,
-    estado TEXT DEFAULT 'pendiente',
-    metodoPago TEXT,
-    fecha TEXT NOT NULL
-  )
-`);
+            CREATE TABLE pedidos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                cliente TEXT,
+                productos TEXT NOT NULL, -- Cambié 'items' por 'productos' para evitar líos
+                total REAL NOT NULL,
+                estado TEXT DEFAULT 'pendiente',
+                metodoPago TEXT,
+                fecha TEXT NOT NULL
+            )
+        `);
 
-    // 3. Tabla de Cierres (LO NUEVO)
+    // 4. Creación de Tabla de Cierres
     await client.execute(`
-      CREATE TABLE cierres (
-        id TEXT PRIMARY KEY,
-        fecha TEXT NOT NULL,
-        totalVentas REAL NOT NULL,
-        cantidadPedidos INTEGER NOT NULL
-      )
-    `);
+            CREATE TABLE cierres (
+                id TEXT PRIMARY KEY,
+                fecha TEXT NOT NULL,
+                totalVentas REAL NOT NULL,
+                cantidadPedidos INTEGER NOT NULL
+            )
+        `);
 
-    // 4. Tabla de Finanzas (LO NUEVO)
+    // 5. Creación de Tabla de Finanzas
     await client.execute(`
-      CREATE TABLE finanzas (
-        id TEXT PRIMARY KEY,
-        fecha TEXT NOT NULL,
-        descripcion TEXT,
-        monto REAL NOT NULL,
-        tipo TEXT NOT NULL
-      )
-    `);
+            CREATE TABLE finanzas (
+                id TEXT PRIMARY KEY,
+                fecha TEXT NOT NULL,
+                descripcion TEXT,
+                monto REAL NOT NULL,
+                tipo TEXT NOT NULL
+            )
+        `);
 
     console.log("📥 Cargando menú de CoCo's Burger...");
 
+    // Inserción de productos
     for (const p of PRODUCTOS) {
       await client.execute({
         sql: `INSERT INTO productos (id, nombre, categoria, precio, imagen, descripcion, tamanos) 
-              VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                      VALUES (?, ?, ?, ?, ?, ?, ?)`,
         args: [
           p.id,
           p.nombre,
@@ -104,7 +101,7 @@ async function initDB() {
       });
     }
 
-    console.log("✅ Base de datos reseteada y lista.");
+    console.log("✅ Base de datos reseteada y menú cargado con éxito.");
     process.exit(0);
   } catch (error) {
     console.error("❌ Error inicializando:", error);
