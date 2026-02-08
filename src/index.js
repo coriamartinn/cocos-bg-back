@@ -7,6 +7,7 @@ import { client } from './db.js'; // <--- AGREGADO (Asegurate que la ruta sea co
 import productosRoutes from './routes/productos.routes.js';
 import pedidosRoutes from './routes/pedidos.routes.js';
 import finanzasRoutes from './routes/finanzas.routes.js';
+import usuariosRoutes from './routes/usuarios.routes.js';
 
 // Configuración de variables de entorno
 dotenv.config();
@@ -37,6 +38,7 @@ app.use(express.json());
 app.use('/api/productos', productosRoutes);
 app.use('/api/pedidos', pedidosRoutes);
 app.use('/api/finanzas', finanzasRoutes);
+app.use('/api/auth', usuariosRoutes);
 
 // --- RUTA DE CIERRE DE DÍA (Directa) ---
 app.post('/api/cierre-caja', async (req, res) => {

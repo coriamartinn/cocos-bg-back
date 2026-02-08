@@ -1,4 +1,4 @@
-import { client } from './db.js';
+import { client } from '../src/db.js';
 
 const PRODUCTOS = [
   // LÍNEA JUNIOR (80g)
