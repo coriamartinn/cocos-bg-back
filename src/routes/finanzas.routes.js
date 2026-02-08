@@ -69,7 +69,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // --- 4. POST: Lógica de Cierre de Caja (Proceso diario) ---
-router.post('/cierre', async (req, res) => {
+router.post('/cierre-caja', async (req, res) => {
     const { totalVentas, cantidadPedidos } = req.body;
     const fecha = new Date().toISOString();
 
