@@ -62,9 +62,16 @@ router.post('/', async (req, res) => {
         const nuevoPedido = result.rows[0];
 
         // Parseamos los productos para devolverlos como objeto al front
+        let productosParsed = [];
+        try {
+            productosParsed = typeof nuevoPedido.productos === 'string' ? JSON.parse(nuevoPedido.productos) : nuevoPedido.productos;
+        } catch (e) {
+            productosParsed = [];
+        }
+
         res.status(201).json({
             ...nuevoPedido,
-            productos: typeof nuevoPedido.productos === 'string' ? JSON.parse(nuevoPedido.productos) : nuevoPedido.productos,
+            productos: productosParsed,
             numeroPedido: proximoNumero // Devolvemos explícitamente el número generado
         });
 
@@ -93,11 +100,24 @@ router.get('/', async (req, res) => {
             args: [usuarioId]
         });
 
-        const pedidos = result.rows.map(row => ({
-            ...row,
-            // Nos aseguramos de parsear el JSON de productos
-            productos: typeof row.productos === 'string' ? JSON.parse(row.productos) : row.productos
-        }));
+        const pedidos = result.rows.map(row => {
+            // LÓGICA ROBUSTA PARA EVITAR ERROR 500 SI EL JSON ESTÁ ROTO
+            let productosParsed = [];
+            try {
+                productosParsed = typeof row.productos === 'string'
+                    ? JSON.parse(row.productos)
+                    : (row.productos || []);
+            } catch (e) {
+                console.warn(`⚠️ Error parseando productos del pedido ${row.id}`, e);
+                productosParsed = []; // Si falla, devolvemos array vacío en vez de romper todo
+            }
+
+            return {
+                ...row,
+                productos: productosParsed,
+                numeroPedido: row.numero_pedido || 0 // Mapeamos para el frontend
+            };
+        });
 
         res.json(pedidos);
     } catch (error) {
