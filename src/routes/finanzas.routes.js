@@ -68,42 +68,22 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
-// --- 4. POST: Lógica de Cierre de Caja (Proceso diario) ---
-router.post('/cierre-caja', async (req, res) => {
-    const { totalVentas, cantidadPedidos } = req.body;
-    const fecha = new Date().toISOString();
+// Ruta para actualizar un movimiento
+router.put('/:id', async (req, res) => {
+    const { id } = req.params;
+    const { descripcion, monto, tipo } = req.body;
 
     try {
-        const total = Number(totalVentas) || 0;
-        const cantidad = Number(cantidadPedidos) || 0;
-
-        // 1. Guardamos el resumen del día en la tabla histórica de cierres
         await client.execute({
-            sql: "INSERT INTO cierres (id, fecha, totalVentas, cantidadPedidos) VALUES (?, ?, ?, ?)",
-            args: [crypto.randomUUID(), fecha, total, cantidad]
+            sql: "UPDATE finanzas SET descripcion = ?, monto = ?, tipo = ? WHERE id = ?",
+            args: [descripcion.trim(), Number(monto), tipo, id]
         });
-
-        // 2. Registramos el ingreso en el balance general de finanzas
-        await client.execute({
-            sql: "INSERT INTO finanzas (id, fecha, descripcion, monto, tipo) VALUES (?, ?, ?, ?, ?)",
-            args: [crypto.randomUUID(), fecha, `CIERRE: ${cantidad} pedidos`, total, 'ingreso']
-        });
-
-        // 3. Borramos los pedidos activos del día
-        await client.execute("DELETE FROM pedidos");
-
-        // 4. Reset del contador AUTOINCREMENT para que mañana empiece del #1
-        await client.execute("DELETE FROM sqlite_sequence WHERE name='pedidos'");
-
-        res.json({
-            success: true,
-            message: "Cierre completado. Pedidos borrados y contador reseteado."
-        });
-
+        res.json({ success: true, message: "Movimiento actualizado" });
     } catch (error) {
-        console.error("Error en el proceso de cierre:", error);
-        res.status(500).json({ error: "Fallo crítico en el cierre de caja" });
+        res.status(500).json({ error: "Error al actualizar" });
     }
 });
+
+
 
 export default router;
