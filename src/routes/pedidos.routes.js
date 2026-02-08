@@ -3,19 +3,25 @@ import { client } from '../db.js';
 
 const router = Router();
 
-// --- POST: Crear pedido ---
+// --- POST: Crear pedido (Asignado al usuario) ---
 router.post('/', async (req, res) => {
+    const usuarioId = req.headers['x-user-id'];
+
     // El front puede mandar 'items' o 'productos', aquí lo normalizamos
     const { cliente, items, productos, total, metodoPago, fecha } = req.body;
     const listaProductos = productos || items; // Soporta ambos nombres
 
+    if (!usuarioId) {
+        return res.status(400).json({ error: "No se puede crear pedido sin usuario asignado" });
+    }
+
     try {
         const fechaFinal = fecha || new Date().toISOString();
 
-        // Eliminé 'numeroPedido' de la consulta porque usamos el 'id' autoincremental
+        // INSERTAMOS CON EL usuario_id
         const result = await client.execute({
-            sql: `INSERT INTO pedidos (cliente, productos, total, estado, metodoPago, fecha) 
-                  VALUES (?, ?, ?, ?, ?, ?) 
+            sql: `INSERT INTO pedidos (cliente, productos, total, estado, metodoPago, fecha, usuario_id) 
+                  VALUES (?, ?, ?, ?, ?, ?, ?) 
                   RETURNING *`,
             args: [
                 cliente || 'Consumidor Final',
@@ -23,7 +29,8 @@ router.post('/', async (req, res) => {
                 total || 0,
                 'pendiente',
                 metodoPago || 'Efectivo',
-                fechaFinal
+                fechaFinal,
+                usuarioId // <--- SELLO DEL DUEÑO
             ]
         });
 
@@ -43,10 +50,20 @@ router.post('/', async (req, res) => {
     }
 });
 
-// --- GET: Obtener todos los pedidos ---
+// --- GET: Obtener pedidos DEL USUARIO ACTUAL ---
 router.get('/', async (req, res) => {
+    const usuarioId = req.headers['x-user-id'];
+
+    if (!usuarioId) {
+        return res.status(400).json({ error: "Falta identificación de usuario (x-user-id)" });
+    }
+
     try {
-        const result = await client.execute("SELECT * FROM pedidos ORDER BY id ASC");
+        // FILTRO CLAVE: WHERE usuario_id = ?
+        const result = await client.execute({
+            sql: "SELECT * FROM pedidos WHERE usuario_id = ? ORDER BY id ASC",
+            args: [usuarioId]
+        });
 
         const pedidos = result.rows.map(row => ({
             ...row,
@@ -61,18 +78,23 @@ router.get('/', async (req, res) => {
     }
 });
 
-// --- PATCH: Actualizar estado ---
+// --- PATCH: Actualizar estado (Solo si es tu pedido) ---
 router.patch('/:id', async (req, res) => {
+    const usuarioId = req.headers['x-user-id'];
     const { id } = req.params;
     const { estado } = req.body;
+
+    if (!usuarioId) return res.status(401).json({ error: "Acceso denegado" });
+
     try {
+        // SEGURIDAD: AND usuario_id = ?
         const result = await client.execute({
-            sql: "UPDATE pedidos SET estado = ? WHERE id = ?",
-            args: [estado, id]
+            sql: "UPDATE pedidos SET estado = ? WHERE id = ? AND usuario_id = ?",
+            args: [estado, id, usuarioId]
         });
 
         if (result.rowsAffected === 0) {
-            return res.status(404).json({ error: "Pedido no encontrado" });
+            return res.status(404).json({ error: "Pedido no encontrado o no te pertenece" });
         }
 
         res.json({ success: true, id, nuevoEstado: estado });
@@ -82,17 +104,22 @@ router.patch('/:id', async (req, res) => {
     }
 });
 
-// --- DELETE: Eliminar pedido ---
+// --- DELETE: Eliminar pedido (Solo si es tuyo) ---
 router.delete('/:id', async (req, res) => {
+    const usuarioId = req.headers['x-user-id'];
     const { id } = req.params;
+
+    if (!usuarioId) return res.status(401).json({ error: "Acceso denegado" });
+
     try {
+        // SEGURIDAD: AND usuario_id = ?
         const result = await client.execute({
-            sql: "DELETE FROM pedidos WHERE id = ?",
-            args: [id]
+            sql: "DELETE FROM pedidos WHERE id = ? AND usuario_id = ?",
+            args: [id, usuarioId]
         });
 
         if (result.rowsAffected === 0) {
-            return res.status(404).json({ error: "Pedido no encontrado" });
+            return res.status(404).json({ error: "Pedido no encontrado o no te pertenece" });
         }
 
         res.json({ success: true, message: "Pedido eliminado" });
