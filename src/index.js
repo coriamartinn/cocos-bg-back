@@ -1,6 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import crypto from 'crypto'; // <--- AGREGADO
+import { client } from './db.js'; // <--- AGREGADO (Asegurate que la ruta sea correcta)
+
 import productosRoutes from './routes/productos.routes.js';
 import pedidosRoutes from './routes/pedidos.routes.js';
 import finanzasRoutes from './routes/finanzas.routes.js';
@@ -18,7 +21,6 @@ const allowedOrigins = [
 
 app.use(cors({
     origin: function (origin, callback) {
-        // Permitir peticiones sin origen (como Postman o apps móviles) o de orígenes permitidos
         if (!origin || allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
@@ -32,11 +34,9 @@ app.use(cors({
 app.use(express.json());
 
 // --- CENTRAL DE RUTAS (Modulares) ---
-// Cada una cuelga de su propio prefijo /api/...
 app.use('/api/productos', productosRoutes);
 app.use('/api/pedidos', pedidosRoutes);
 app.use('/api/finanzas', finanzasRoutes);
-
 
 // --- RUTA DE CIERRE DE DÍA (Directa) ---
 app.post('/api/cierre-caja', async (req, res) => {
@@ -47,7 +47,6 @@ app.post('/api/cierre-caja', async (req, res) => {
         const total = Number(totalVentas) || 0;
         const cantidad = Number(cantidadPedidos) || 0;
 
-        // Ejecutamos todo en orden
         // 1. Guardar el histórico en la tabla 'cierres'
         await client.execute({
             sql: "INSERT INTO cierres (id, fecha, totalVentas, cantidadPedidos) VALUES (?, ?, ?, ?)",
@@ -60,19 +59,19 @@ app.post('/api/cierre-caja', async (req, res) => {
             args: [crypto.randomUUID(), fecha, `CIERRE DE CAJA: ${cantidad} pedidos`, total, 'ingreso']
         });
 
-        // 3. Limpiar la mesa de pedidos activos para empezar el nuevo día
+        // 3. Limpiar la mesa de pedidos activos
         await client.execute("DELETE FROM pedidos");
 
-        // 4. Resetear el autoincremental de los pedidos (opcional, según tu DB)
+        // 4. Resetear el autoincremental
         try {
             await client.execute("DELETE FROM sqlite_sequence WHERE name='pedidos'");
         } catch (seqError) {
-            console.log("Aviso: No se pudo resetear la secuencia (normal si no usas AUTOINCREMENT)");
+            console.log("Aviso: No se pudo resetear la secuencia.");
         }
 
         res.json({
             success: true,
-            message: "Cierre completado con éxito. Datos migrados a finanzas y pedidos reseteados."
+            message: "Cierre completado con éxito."
         });
 
     } catch (error) {
@@ -84,7 +83,7 @@ app.post('/api/cierre-caja', async (req, res) => {
     }
 });
 
-// --- MANEJO DE ERRORES GLOBAL (Opcional pero recomendado) ---
+// --- MANEJO DE ERRORES GLOBAL ---
 app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).json({ error: 'Algo salió mal en el servidor' });
@@ -92,7 +91,6 @@ app.use((err, req, res, next) => {
 
 // --- INICIO DEL SERVIDOR ---
 const PORT = process.env.PORT || 8000;
-
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`==========================================`);
     console.log(`🍔 CoCo's Burger API - CoriaTech Studio`);
