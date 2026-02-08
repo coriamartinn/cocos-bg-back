@@ -20,7 +20,7 @@ app.use('/api/pedidos', pedidosRoutes);
 app.use('/api/finanzas', finanzasRoutes);
 
 // --- RUTA DE CIERRE DE DÍA (Directa) ---
-app.post('/api/cierre', async (req, res) => {
+app.post('/api/cierre-caja', async (req, res) => {
     const { totalVentas, cantidadPedidos } = req.body;
     const fecha = new Date().toISOString();
 
