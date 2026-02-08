@@ -1,15 +1,17 @@
 import { Router } from 'express';
 import { createClient } from "@libsql/client";
 import dotenv from "dotenv";
+import bcrypt from 'bcryptjs'; // <--- IMPORTANTE: Para seguridad
+import crypto from 'crypto';   // <--- Para generar IDs
 
 dotenv.config();
 
 const router = Router();
 
-// Conexión a la BD (Asegurate de que las variables de entorno coincidan con las de tu server.js)
+// Conexión a la BD
 const db = createClient({
-    url: process.env.TURSO_DATABASE_URL || "libsql://cocos-burger-coriamartinn.aws-us-east-1.turso.io",
-    authToken: process.env.TURSO_AUTH_TOKEN || "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NzA0ODM5MzUsImlkIjoiYjFiM2JlYWItZTJhOC00YTQyLWI1YTgtMWMwMTYxMTNiNDIzIiwicmlkIjoiYjAzZTc3NjYtOGI4MC00OTM4LWE4ZGEtMDc5MjNhODY3NTAwIn0.5_1EJ8uiKgnQwq5FM0cj7fdVhmOHfsVbAnYHfkiWZTm2Bp_NmDiGqZsz7WmGUCBYX-WHfaLwCMHsAVYgfNAUCA"
+    url: process.env.TURSO_DATABASE_URL,
+    authToken: process.env.TURSO_AUTH_TOKEN
 });
 
 // --- 1. LOGIN (Entrar al sistema) ---
@@ -25,26 +27,26 @@ router.post('/login', async (req, res) => {
 
         const usuario = result.rows[0];
 
-        // Validaciones
+        // Validaciones: ¿Existe el usuario?
         if (!usuario) {
             return res.status(404).json({ error: "Usuario no encontrado" });
         }
 
-        // NOTA: Para producción real, acá deberíamos usar bcrypt.compare()
-        // Por ahora comparamos texto plano como definimos en el script anterior.
-        if (usuario.password !== password) {
+        // SEGURIDAD: Comparamos la contraseña escrita con el Hash de la BD
+        const passwordValida = await bcrypt.compare(password, usuario.password);
+
+        if (!passwordValida) {
             return res.status(401).json({ error: "Contraseña incorrecta" });
         }
 
-        // ¡Éxito! Devolvemos los datos (menos la password)
-        // El frontend usará 'comprado' para decidir si muestra el bloqueo o la app.
+        // ¡Éxito! Devolvemos los datos (sin la password)
         res.json({
             success: true,
             usuario: {
                 id: usuario.id,
                 nombre_local: usuario.nombre_local,
                 email: usuario.email,
-                comprado: usuario.comprado // 1 = Pasa, 0 = Bloqueo
+                comprado: usuario.comprado // 1 = Puede usar la app, 0 = Bloqueado
             }
         });
 
@@ -54,22 +56,27 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// --- 2. REGISTER (Nuevo cliente potencial) ---
+// --- 2. REGISTER (Nuevo cliente) ---
 router.post('/register', async (req, res) => {
     const { email, password, nombre_local } = req.body;
 
+    // Validación básica
     if (!email || !password || !nombre_local) {
         return res.status(400).json({ error: "Faltan datos obligatorios" });
     }
 
     try {
-        // Creamos el usuario. Por defecto 'comprado' será 0 (definido en la BD)
+        // SEGURIDAD: Hasheamos la contraseña antes de guardarla
+        const salt = await bcrypt.genSalt(10);
+        const passwordHash = await bcrypt.hash(password, salt);
+
         const id = crypto.randomUUID();
 
+        // Guardamos el usuario con la contraseña ENCRIPTADA y comprado = 0
         await db.execute({
             sql: `INSERT INTO usuarios (id, email, password, nombre_local, comprado) 
-            VALUES (?, ?, ?, ?, 0)`,
-            args: [id, email, password, nombre_local]
+                  VALUES (?, ?, ?, ?, 0)`,
+            args: [id, email, passwordHash, nombre_local]
         });
 
         res.status(201).json({
@@ -79,7 +86,7 @@ router.post('/register', async (req, res) => {
 
     } catch (error) {
         // Si el email ya existe (error de constraint UNIQUE)
-        if (error.message.includes("UNIQUE")) {
+        if (error.message && error.message.includes("UNIQUE")) {
             return res.status(400).json({ error: "El email ya está registrado" });
         }
         console.error("Error en registro:", error);
@@ -87,8 +94,7 @@ router.post('/register', async (req, res) => {
     }
 });
 
-// --- 3. VERIFICAR (Para reconectar sesión) ---
-// Sirve para consultar el estado actual si el usuario refresca la página
+// --- 3. VERIFICAR ESTADO (Para reconectar sesión o validar licencia) ---
 router.get('/estado/:id', async (req, res) => {
     const { id } = req.params;
     try {
@@ -101,6 +107,7 @@ router.get('/estado/:id', async (req, res) => {
 
         res.json(result.rows[0]);
     } catch (error) {
+        console.error("Error al verificar estado:", error);
         res.status(500).send();
     }
 });
