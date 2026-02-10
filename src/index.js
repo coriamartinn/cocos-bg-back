@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
 import { createClient } from "@libsql/client"; // Asegurate de importar createClient si usas Turso directo acá
+import publicoRoutes from "./routes/public.routes.js";
 import productosRoutes from './routes/productos.routes.js';
 import pedidosRoutes from './routes/pedidos.routes.js';
 import finanzasRoutes from './routes/finanzas.routes.js';
@@ -38,6 +39,13 @@ app.use(cors({
 
 // --- MIDDLEWARES ---
 app.use(express.json());
+
+// ==========================================
+// 🔓 ZONA LIBRE (PÚBLICA)
+// ==========================================
+// Todo lo que empiece con /api/public pasa sin llave
+app.use('/api/public', publicoRoutes);   // <--- 2. USAR ACÁ
+
 
 // --- CENTRAL DE RUTAS (Modulares) ---
 // Aquí es donde está la lógica de hasheo (en usuariosRoutes)
