@@ -1,19 +1,16 @@
 import { Router } from 'express';
-import client from '../db.js';
+import { client } from '../db.js'; // 👈 Asegurate que sea { client } si exportas así en db.js
 import crypto from 'crypto';
 
 const router = Router();
 
-// --- GET: Obtener SOLO los productos del usuario actual ---
+// --- GET: Obtener menú del usuario ---
 router.get('/', async (req, res) => {
     const usuarioId = req.headers['x-user-id'];
 
-    if (!usuarioId) {
-        return res.status(400).json({ error: "Falta identificación de usuario (x-user-id)" });
-    }
+    if (!usuarioId) return res.status(400).json({ error: "Falta identificación de usuario" });
 
     try {
-        // FILTRO CLAVE: WHERE usuario_id = ?
         const result = await client.execute({
             sql: "SELECT * FROM productos WHERE usuario_id = ?",
             args: [usuarioId]
@@ -21,89 +18,90 @@ router.get('/', async (req, res) => {
 
         const productos = result.rows.map(row => ({
             ...row,
-            tamanos: typeof row.tamanos === 'string' ? JSON.parse(row.tamanos) : (row.tamanos || [])
+            tamanos: typeof row.tamanos === 'string' ? JSON.parse(row.tamanos) : (row.tamanos || null)
         }));
 
         res.json(productos);
     } catch (error) {
-        console.error("Error en GET productos:", error);
+        console.error("Error GET productos:", error);
         res.status(500).json({ error: "Error al obtener productos" });
     }
 });
 
-// --- POST: Agregar producto ASIGNADO al usuario ---
+// --- POST: Crear producto ---
 router.post('/', async (req, res) => {
     const usuarioId = req.headers['x-user-id'];
-    const { nombre, precio, categoria, imagen, tamanos } = req.body;
+    // Recibimos 'tamanos' (con ñ o n, idealmente usá n para código)
+    const { nombre, precio, categoria, imagen, tamanos, descripcion } = req.body;
     const id = crypto.randomUUID();
 
-    if (!usuarioId) {
-        return res.status(400).json({ error: "No se puede crear producto sin usuario asignado" });
-    }
+    if (!usuarioId) return res.status(400).json({ error: "Falta usuario" });
+    if (!nombre) return res.status(400).json({ error: "Nombre obligatorio" });
 
     try {
-        if (!nombre || !precio) {
-            return res.status(400).json({ error: "Nombre y precio son obligatorios" });
-        }
+        // Preparamos el JSON de tamaños (si es null, guardamos null o empty string)
+        const tamanosStr = tamanos ? JSON.stringify(tamanos) : null;
 
-        // INSERTAMOS CON EL usuario_id
         await client.execute({
-            sql: `INSERT INTO productos (id, nombre, precio, categoria, imagen, tamanos, usuario_id) 
-                  VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            sql: `INSERT INTO productos (id, nombre, precio, categoria, imagen, tamanos, descripcion, usuario_id) 
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             args: [
                 id,
                 nombre.trim(),
                 Number(precio),
                 categoria || 'BURGER',
                 imagen || '',
-                JSON.stringify(tamanos || []),
-                usuarioId // <--- EL SELLO DEL DUEÑO
+                tamanosStr,
+                descripcion || '',
+                usuarioId
             ]
         });
 
-        res.status(201).json({ id, nombre, precio, categoria, imagen, tamanos });
+        res.status(201).json({ id, nombre, precio, categoria, imagen, tamanos, descripcion });
     } catch (error) {
-        console.error("Error en POST productos:", error);
-        res.status(500).json({ error: "No se pudo crear el producto" });
+        console.error("Error POST productos:", error);
+        res.status(500).json({ error: "No se pudo crear" });
     }
 });
 
-// --- PUT: Editar producto (Solo si es tuyo) ---
+// --- PUT: Editar producto ---
 router.put('/:id', async (req, res) => {
     const usuarioId = req.headers['x-user-id'];
     const { id } = req.params;
-    const { nombre, precio, categoria, imagen, tamanos } = req.body;
+    const { nombre, precio, categoria, imagen, tamanos, descripcion } = req.body;
 
     if (!usuarioId) return res.status(401).json({ error: "Acceso denegado" });
 
     try {
-        // SEGURIDAD: AND usuario_id = ? (Para que Pepe no edite la hamburguesa de Juan)
+        const tamanosStr = tamanos ? JSON.stringify(tamanos) : null;
+
         const result = await client.execute({
-            sql: `UPDATE productos SET nombre = ?, precio = ?, categoria = ?, imagen = ?, tamanos = ? 
+            sql: `UPDATE productos SET nombre = ?, precio = ?, categoria = ?, imagen = ?, tamanos = ?, descripcion = ?
                   WHERE id = ? AND usuario_id = ?`,
             args: [
                 nombre.trim(),
                 Number(precio),
                 categoria,
                 imagen || '',
-                JSON.stringify(tamanos || []),
+                tamanosStr,
+                descripcion || '',
                 id,
-                usuarioId // <--- IMPORTANTE
+                usuarioId
             ]
         });
 
         if (result.rowsAffected === 0) {
-            return res.status(404).json({ error: "Producto no encontrado o no te pertenece" });
+            return res.status(404).json({ error: "Producto no encontrado" });
         }
 
-        res.json({ success: true, message: "Producto actualizado correctamente" });
+        res.json({ success: true });
     } catch (error) {
-        console.error("Error en PUT productos:", error);
-        res.status(500).json({ error: "No se pudo actualizar el producto" });
+        console.error("Error PUT productos:", error);
+        res.status(500).json({ error: "Error al actualizar" });
     }
 });
 
-// --- DELETE: Eliminar producto (Solo si es tuyo) ---
+// --- DELETE: Borrar producto ---
 router.delete('/:id', async (req, res) => {
     const usuarioId = req.headers['x-user-id'];
     const { id } = req.params;
@@ -111,20 +109,16 @@ router.delete('/:id', async (req, res) => {
     if (!usuarioId) return res.status(401).json({ error: "Acceso denegado" });
 
     try {
-        // SEGURIDAD: AND usuario_id = ?
         const result = await client.execute({
             sql: "DELETE FROM productos WHERE id = ? AND usuario_id = ?",
             args: [id, usuarioId]
         });
 
-        if (result.rowsAffected === 0) {
-            return res.status(404).json({ error: "Producto no encontrado o no te pertenece" });
-        }
+        if (result.rowsAffected === 0) return res.status(404).json({ error: "No encontrado" });
 
-        res.json({ success: true, message: "Producto eliminado del menú" });
+        res.json({ success: true });
     } catch (error) {
-        console.error("Error en DELETE productos:", error);
-        res.status(500).json({ error: "Error al eliminar el producto" });
+        res.status(500).json({ error: "Error al eliminar" });
     }
 });
 
