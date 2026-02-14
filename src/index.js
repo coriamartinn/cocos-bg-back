@@ -126,7 +126,7 @@ app.use((err, req, res, next) => {
 });
 
 // --- INICIO DEL SERVIDOR ---
-const PORT = process.env.PORT || 8000;
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`==========================================`);
     console.log(`🍔 CoCo's Burger API - CoriaTech Studio`);
