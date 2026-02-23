@@ -6,8 +6,8 @@ const router = Router();
 // --- CREAR PEDIDO ---
 router.post('/', async (req, res) => {
     const usuarioId = req.headers['x-user-id'];
-    // 👇 ACEPTAMOS 'items' (Nuevo) O 'productos' (Viejo)
-    const { id, cliente, items, productos, total, metodoPago, fecha, notas } = req.body;
+    // 👇 AGREGAMOS direccionEntrega AL DESTRUCTURING
+    const { id, cliente, items, productos, total, metodoPago, fecha, notas, direccionEntrega } = req.body;
 
     // Normalizamos: Si viene 'items', usamos eso. Si no, 'productos'. Si no, array vacío.
     const listaItems = items || productos || [];
@@ -39,10 +39,10 @@ router.post('/', async (req, res) => {
         const fechaFinal = fecha || new Date().toISOString();
 
         // 2. INSERTAR EN BASE DE DATOS
-        // Nota: Guardamos en la columna 'productos' aunque conceptualmente son 'items'
+        // 👇 AGREGAMOS direccion_entrega A LA CONSULTA SQL
         await client.execute({
-            sql: `INSERT INTO pedidos (id, cliente, productos, total, estado, metodoPago, fecha, usuario_id, numero_pedido, notas) 
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            sql: `INSERT INTO pedidos (id, cliente, productos, total, estado, metodoPago, fecha, usuario_id, numero_pedido, notas, direccion_entrega) 
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             args: [
                 id,
                 cliente || 'Consumidor Final',
@@ -53,23 +53,25 @@ router.post('/', async (req, res) => {
                 fechaFinal,
                 usuarioId,
                 nuevoNumero,
-                notas || ''
+                notas || '',
+                direccionEntrega || null // 👇 GUARDAMOS LA DIRECCIÓN ACÁ
             ]
         });
 
         console.log(`✅ Pedido creado: #${nuevoNumero} (${listaItems.length} items)`);
 
-        // 3. RESPONDER AL FRONTEND (Devolvemos 'items' para que coincida con tus tipos.ts)
+        // 3. RESPONDER AL FRONTEND (Devolvemos 'items' y 'direccionEntrega')
         res.status(201).json({
             id,
             numeroPedido: nuevoNumero,
             cliente,
-            items: listaItems, // 👈 DEVOLVEMOS 'items'
+            items: listaItems,
             total,
             estado: 'pendiente',
             metodoPago,
             fecha: fechaFinal,
-            notas: notas || ''
+            notas: notas || '',
+            direccionEntrega: direccionEntrega || null // 👇 DEVOLVEMOS LA DIRECCIÓN
         });
 
     } catch (error) {
@@ -86,8 +88,9 @@ router.post('/', async (req, res) => {
                     const parsedItems = typeof p.productos === 'string' ? JSON.parse(p.productos) : p.productos;
                     return res.status(200).json({
                         ...p,
-                        items: parsedItems, // Mapeamos a items
-                        numeroPedido: p.numero_pedido
+                        items: parsedItems,
+                        numeroPedido: p.numero_pedido,
+                        direccionEntrega: p.direccion_entrega // 👇 MAPEO EN CASO DE DUPLICADO
                     });
                 }
             } catch (e) { /* ignorar */ }
@@ -114,9 +117,9 @@ router.get('/', async (req, res) => {
         // TRANSFORMACIÓN DE DATOS (DB -> Frontend)
         const pedidos = result.rows.map(r => ({
             ...r,
-            // La DB tiene 'productos', el Front quiere 'items'. Hacemos el cambio acá.
             items: typeof r.productos === 'string' ? JSON.parse(r.productos) : r.productos,
-            numeroPedido: r.numero_pedido
+            numeroPedido: r.numero_pedido,
+            direccionEntrega: r.direccion_entrega // 👇 ESTO ES CLAVE PARA QUE EL FRONT LO VEA COMO direccionEntrega
         }));
 
         res.json(pedidos);
