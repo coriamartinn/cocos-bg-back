@@ -10,7 +10,7 @@ router.post('/', async (req, res) => {
     const { id, cliente, items, productos, total, metodoPago, fecha, notas, direccionEntrega } = req.body;
     console.log("🚨 ATENCIÓN - DIRECCIÓN RECIBIDA:", direccionEntrega);
     // Normalizamos: Si viene 'items', usamos eso. Si no, 'productos'. Si no, array vacío.
-    const listaItems = items || productos || [];
+    const listaItems = items || [];
 
     // Convertimos a String para guardar en SQLite/Turso
     const itemsString = typeof listaItems === 'string' ? listaItems : JSON.stringify(listaItems);
