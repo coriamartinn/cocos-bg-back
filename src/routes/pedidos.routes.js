@@ -8,7 +8,7 @@ router.post('/', async (req, res) => {
     const usuarioId = req.headers['x-user-id'];
     // 👇 AGREGAMOS direccionEntrega AL DESTRUCTURING
     const { id, cliente, items, productos, total, metodoPago, fecha, notas, direccionEntrega } = req.body;
-
+    console.log("🚨 ATENCIÓN - DIRECCIÓN RECIBIDA:", direccionEntrega);
     // Normalizamos: Si viene 'items', usamos eso. Si no, 'productos'. Si no, array vacío.
     const listaItems = items || productos || [];
 
